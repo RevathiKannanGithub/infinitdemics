@@ -1,0 +1,75 @@
+Set up scheduled tasks, like a cron job or batch job, with IBM Cloud Functions powered by Apache OpenWhisk. This tutorial should take about 5 minutes to complete. After this, move on to more complex serverless applications such as those tagged openwhisk-hands-on-demo.
+
+If you're not familiar with the OpenWhisk programming model try the action, trigger, and rule sample first. You'll need a Bluemix account and the latest OpenWhisk command line tool.
+
+This example shows how to create an action that runs when invoked by a cron-style trigger. You can learn about other types of alarm triggers in the Cloud Functions documentation.
+
+Define and test the action
+Create create the cron-style trigger
+Map the trigger to the action
+Clean up
+1. Define and test the action
+This simple JavaScript function (called an action in OpenWhisk) accepts a params argument and writes information that can be retrieved from the Cloud Functions activation log and/or the IBM Cloud Functions monitoring console. It also returns a JSON object with the current date.
+
+First, open a terminal window to start polling the activation log. The console.log statements in the action will be logged here, which you can stream with the following command:
+
+wsk activation poll
+Next, create a file named handler.js. This file will define an action written as a JavaScript function. This function will print out the date to the logs and return the same data from the function.
+
+function main(params) {
+
+  var date = new Date();
+
+  console.log("Invoked at: " + date.toLocaleString());
+
+  return { 
+    message: "Invoked at: " + date.toLocaleString() 
+  };
+
+}
+In another terminal window, upload the action file as a Cloud Function using the following command:
+
+wsk action create handler handler.js
+Then invoke it manually. This will echo the resulting JSON message to the current window and log the activation in the other window.
+
+wsk action invoke --blocking handler
+2. Create the cron-style trigger
+Triggers can be explicitly fired by a user or fired on behalf of a user by an external event source, such as an alarm. This trigger uses the built-in alarm package feed to fire events every 20 seconds. This is specified through cron syntax in the cron parameter.
+
+Create an every-20-seconds with the following command:
+
+wsk trigger create every-20-seconds \
+  --feed  /whisk.system/alarms/alarm \
+  --param cron '*/20 * * * * *' \
+Once it's created, you will see activations firing in the log, but it's not yet mapped to the handler action so it's not very exciting.
+
+3. Map the trigger to the action
+Rules provide a mechanism for mapping triggers to actions in a many-to-many relationship. That is, one trigger can fire many independent actions and a single action can be triggered by many different triggers.
+
+This rule shows how the every-20-seconds trigger can be declaratively mapped to the handler.js action. Notice that it's named somewhat abstractly so that if we wanted to use a different trigger - perhaps something that fires every minute instead - we could still keep the same logical name.
+
+Create the rule with the following command:
+
+wsk rule create \
+  invoke-periodically \
+  every-20-seconds \
+  handler
+At this point you can check the activation log that you are tailing in the other window to confirm that the action is invoked by the trigger.
+
+4. Clean up
+Remove the rule, trigger, action, and package
+# Remove rule
+wsk rule disable invoke-periodically
+wsk rule delete invoke-periodically
+
+# Remove trigger
+wsk trigger delete every-20-seconds
+
+# Remove actions
+wsk action delete handler
+Troubleshooting
+Check for errors first in the Cloud Functions activation log. Tail the log on the command line with wsk activation poll or drill into details visually with the Cloud Functions monitoring console.
+
+If the error is not immediately obvious, make sure you have the latest version of the wsk CLI installed. If it's older than a few weeks, download an update.
+
+wsk property get --cliversion
